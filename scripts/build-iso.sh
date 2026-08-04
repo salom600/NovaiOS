@@ -121,34 +121,34 @@ fi
 echo "::endgroup::"
 
 # =============================================================================
-# 1b. Install Calamares from AUR (not in official repos)
+# 1b. Install Calamares from AUR (best-effort, time-boxed)
 # =============================================================================
-echo "::group::1b. Install Calamares from AUR"
-# Calamares is in the AUR, not the official repos. Build it inside the chroot.
-# This is best-effort — if the AUR build fails, archinstall is still available
-# as the TUI fallback installer.
-arch-chroot "$ROOTFS" bash -c '
-  set -e
-  # Create a build user (makepkg refuses to run as root)
-  id builduser &>/dev/null || useradd -m -G wheel -s /bin/bash builduser
-  echo "builduser ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builduser
-  cd /home/builduser
-
-  # Install AUR helper (yay) — easier than raw makepkg
-  sudo -u builduser git clone https://aur.archlinux.org/yay.git 2>/dev/null || true
-  cd yay
-  sudo -u builduser git pull --rebase 2>/dev/null || true
-  sudo -u builduser makepkg -si --noconfirm --needed 2>&1 || echo "::warning::yay install failed"
-
-  # Use yay to install calamares + its generic config
-  if command -v yay >/dev/null; then
-    sudo -u builduser yay -S --noconfirm --needed calamares calamares-config-generic 2>&1 || \
-      echo "::warning::calamares AUR install failed — archinstall will be the only installer"
-  fi
-
-  # Clean up build artifacts to save space in the squashfs
-  rm -rf /home/builduser/.cache /home/builduser/yay /var/cache/pacman/pkg/*
-' 2>&1 || echo "::warning::AUR/calamares setup failed — archinstall remains available"
+echo "::group::1b. Install Calamares from AUR (best-effort)"
+# Calamares is in the AUR, not the official repos. Building it from source
+# requires compiling Qt + KDE Frameworks deps (~30 min on a CI runner).
+# We skip the AUR build in CI to stay within the 90 min job timeout —
+# archinstall (already in the pacstrap list) is the working TUI installer.
+# Users can install Calamares later with:  sudo pacman -S --needed base-devel && yay -S calamares
+if [[ "${SKIP_AUR_CALAMARES:-1}" == "1" ]]; then
+  echo "::notice::Skipping AUR calamares build (set SKIP_AUR_CALAMARES=0 to enable)."
+  echo "::notice::The TUI installer 'archinstall' is available — run 'sudo archinstall' from the live session."
+else
+  arch-chroot "$ROOTFS" bash -c '
+    set -e
+    id builduser &>/dev/null || useradd -m -G wheel -s /bin/bash builduser
+    echo "builduser ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builduser
+    cd /home/builduser
+    sudo -u builduser git clone https://aur.archlinux.org/yay.git 2>/dev/null || true
+    cd yay
+    sudo -u builduser git pull --rebase 2>/dev/null || true
+    sudo -u builduser makepkg -si --noconfirm --needed 2>&1 || echo "::warning::yay install failed"
+    if command -v yay >/dev/null; then
+      sudo -u builduser yay -S --noconfirm --needed calamares 2>&1 || \
+        echo "::warning::calamares AUR install failed — archinstall will be the only installer"
+    fi
+    rm -rf /home/builduser/.cache /home/builduser/yay /var/cache/pacman/pkg/*
+  ' 2>&1 || echo "::warning::AUR/calamares setup failed — archinstall remains available"
+fi
 echo "::endgroup::"
 
 # =============================================================================
@@ -203,28 +203,30 @@ arch-chroot "$ROOTFS" systemctl enable \
   cups bluetooth sshd \
   2>/dev/null || true
 
-# Calamares desktop entry — so the user can launch the installer from the menu
+# Installer desktop entry — launches archinstall (TUI) in a terminal.
+# Calamares is not in the official Arch repos; users can install it via AUR later.
 install -d "$ROOTFS/usr/share/applications"
 cat > "$ROOTFS/usr/share/applications/novai-installer.desktop" <<'EOF'
 [Desktop Entry]
 Type=Application
 Name=Install NovaiOS
-Comment=Install NovaiOS to your hard drive
-Exec=sudo calamares
+Comment=Install NovaiOS to your hard drive (TUI installer)
+Exec=sudo -E archinstall
 Icon=system-software-install
-Terminal=false
-Categories=System;Settings;
+Terminal=true
+Categories=System;Settings;Installer;
+StartupNotify=true
 EOF
 
-# Autostart the installer on first login to the live session
+# Autostart the installer on first login to the live session (only if novai.install=1 was on cmdline)
 install -d "$ROOTFS/home/novai/.config/autostart"
 cat > "$ROOTFS/home/novai/.config/autostart/novai-installer.desktop" <<'EOF'
 [Desktop Entry]
 Type=Application
 Name=NovaiOS Installer
-Exec=sudo calamares
+Exec=sudo -E archinstall
 Icon=system-software-install
-Terminal=false
+Terminal=true
 X-GNOME-Autostart-enabled=false
 EOF
 chown -R 1000:1000 "$ROOTFS/home/novai/.config" 2>/dev/null || true
