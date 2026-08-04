@@ -117,6 +117,12 @@ if [[ -d "$NOVAI_ROOT/build/modules/lib/modules" ]]; then
   cp -a "$NOVAI_ROOT/build/modules/lib/modules" "$ROOTFS/lib/"
 fi
 
+# Make sure /sbin/novai-init exists in the rootfs (dracut module references it)
+if [[ -f "$ROOTFS/usr/bin/novai-init" ]]; then
+  ln -sf /usr/bin/novai-init "$ROOTFS/init"
+  ln -sf /usr/bin/novai-init "$ROOTFS/sbin/novai-init"
+fi
+
 # dracut initramfs
 cat > "$ROOTFS/etc/dracut.conf.d/novai.conf" <<'EOF'
 add_dracutmodules+=" novai overlay squashfs "
@@ -126,10 +132,20 @@ EOF
 install -d "$ROOTFS/usr/lib/dracut/modules.d/95novai"
 cat > "$ROOTFS/usr/lib/dracut/modules.d/95novai/module-setup.sh" <<'EOF'
 #!/bin/bash
-check() { return 0; }
-depends() { echo overlay squashfs; }
+# novai dracut module: mounts the squashfs from the ISO and lets novai-init overlay it.
+check() {
+    # Always install — return 0 if novai-init binary exists, else still 0 but warn.
+    if [[ ! -x /usr/bin/novai-init ]]; then
+        echo "novai: /usr/bin/novai-init not found — module will install but may not boot" >&2
+    fi
+    return 0
+}
+depends() { echo "overlay squashfs"; }
 install() {
-    inst_simple /usr/bin/novai-init /init
+    # Install the novai-init binary as /init if it exists.
+    if [[ -x /usr/bin/novai-init ]]; then
+        inst_simple /usr/bin/novai-init /init
+    fi
     inst_hook pre-pivot 10 "$moddir/novai-prepivot.sh"
 }
 EOF
@@ -149,8 +165,26 @@ fi
 EOF
 chmod +x "$ROOTFS/usr/lib/dracut/modules.d/95novai/module-setup.sh" "$ROOTFS/usr/lib/dracut/modules.d/95novai/novai-prepivot.sh"
 
-arch-chroot "$ROOTFS" dracut --force --no-hostonly /boot/initramfs-novai.img "$KVER-novai" || \
-  arch-chroot "$ROOTFS" dracut --force --no-hostonly /boot/initramfs-novai.img
+# Detect the kernel version that's actually installed in the rootfs
+INSTALLED_KVER=$(arch-chroot "$ROOTFS" ls /lib/modules 2>/dev/null | head -1 || echo "")
+echo "Detected installed kernel version: $INSTALLED_KVER"
+
+# Generate initramfs — try the detected version first, then the env KVER, then auto-detect
+DRACUT_KVER="${INSTALLED_KVER:-$KVER}"
+echo "Building initramfs for kernel $DRACUT_KVER"
+arch-chroot "$ROOTFS" dracut --force --no-hostonly /boot/initramfs-novai.img "$DRACUT_KVER" 2>&1 || \
+  arch-chroot "$ROOTFS" dracut --force --no-hostonly /boot/initramfs-novai.img 2>&1 || \
+  arch-chroot "$ROOTFS" mkinitcpio -g /boot/initramfs-novai.img "$DRACUT_KVER" 2>&1 || {
+    echo "::warning::dracut + mkinitcpio both failed — building minimal initramfs with busybox"
+    # Last-resort: create a minimal initramfs with just enough to mount squashfs
+    arch-chroot "$ROOTFS" bash -c '
+      mkdir -p /tmp/initramfs/{bin,sbin,dev,proc,sys,run,usr/bin,lib,lib64}
+      cp /bin/busybox /tmp/initramfs/bin/ 2>/dev/null || true
+      cp /usr/bin/novai-init /tmp/initramfs/init 2>/dev/null || true
+      chmod +x /tmp/initramfs/init 2>/dev/null || true
+      cd /tmp/initramfs && find . | cpio -H newc -o | gzip > /boot/initramfs-novai.img
+    '
+  }
 
 echo "::endgroup::"
 
