@@ -104,9 +104,18 @@ pacstrap -c -M -G "$ROOTFS" \
   pkgconf clang llvm lld \
   --needed
 
-# Enable multilib inside the rootfs too (so steam works after install)
+# Enable multilib inside the rootfs too (so steam works after install).
+# pacstrap -G doesn't generate pacman.conf in the rootfs, so we have to
+# copy it from the host (which already has multilib enabled from above).
+if [[ ! -f "$ROOTFS/etc/pacman.conf" ]]; then
+  cp /etc/pacman.conf "$ROOTFS/etc/pacman.conf"
+fi
 if ! grep -q '^\[multilib\]' "$ROOTFS/etc/pacman.conf"; then
   sed -i '/^\[core\]/i [multilib]\nInclude = /etc/pacman.d/mirrorlist' "$ROOTFS/etc/pacman.conf"
+fi
+# Make sure the mirrorlist is present in the rootfs too
+if [[ ! -f "$ROOTFS/etc/pacman.d/mirrorlist" ]]; then
+  cp /etc/pacman.d/mirrorlist "$ROOTFS/etc/pacman.d/mirrorlist"
 fi
 
 echo "::endgroup::"
