@@ -53,8 +53,7 @@ pacstrap -c -M -G "$ROOTFS" \
   base base-devel linux linux-headers linux-firmware \
   systemd systemd-sysvcompat dbus networkmanager \
   dracut squashfs-tools xorriso dosfstools mtools \
-  syslinux systemd-boot-efi efibootmgr \
-  grub grub-bios \
+  syslinux grub \
   rustup git wget curl which sudo nano vi vim \
   mesa libdrm vulkan-radeon vulkan-intel vulkan-swrast nvidia-dkms nvidia-utils \
   pipewire pipewire-pulse pipewire-alsa pipewire-jack pipewire-v4l2 wireplumber \
@@ -301,7 +300,7 @@ if [[ -f "$SYSTEMD_BOOT_EFI" ]]; then
   echo "Installed systemd-boot as BOOTX64.EFI"
 else
   echo "::error::systemd-boot EFI binary not found at $SYSTEMD_BOOT_EFI"
-  echo "Install the 'systemd-boot-efi' package in the archlinux container."
+  echo "Install the 'systemd' package in the archlinux container — it ships systemd-bootx64.efi at /usr/lib/systemd/boot/efi/."
   exit 1
 fi
 

@@ -206,16 +206,20 @@ jobs:
 
       - name: Set up archlinux environment
         run: |
-          # Pre-install the host tools build-iso.sh needs to bootstrap the rootfs
-          # (the script does its own pacstrap for the rootfs with the full package list).
+          # Pre-install the host tools build-iso.sh needs to bootstrap the rootfs.
+          # The systemd-boot EFI binary ships with the 'systemd' package at
+          # /usr/lib/systemd/boot/efi/systemd-bootx64.efi — no separate package.
           pacman -Syu --noconfirm --needed \
             base base-devel arch-install-scripts \
             linux linux-headers linux-firmware \
             dracut squashfs-tools xorriso dosfstools mtools \
-            syslinux systemd-boot-efi efibootmgr grub \
-            systemd rustup git wget curl which sudo nano \
+            syslinux systemd grub \
+            rustup git wget curl which sudo nano \
             clang llvm lld pkgconf
           rustup default stable
+          # Verify the systemd-boot EFI binary is present
+          ls -la /usr/lib/systemd/boot/efi/systemd-bootx64.efi || \
+            echo "::warning::systemd-bootx64.efi not found — UEFI boot will fail"
 
       - uses: actions/download-artifact@v4
         with:
