@@ -18,7 +18,7 @@ WORK="${WORK:-$NOVAI_ROOT/build/iso-work}"
 ROOTFS="$WORK/airootfs"
 ISO_DIR="$WORK/iso"
 OUT_DIR="${OUT_DIR:-$NOVAI_ROOT/build/out}"
-KVER="${KVER:-6.12.10}"
+KVER="${KVER:-$(uname -r)}"          # default to the running kernel (works in archlinux container)
 ISO_LABEL="${ISO_LABEL:-NOVAI_ISO}"
 ISO_NAME="${ISO_NAME:-novaios-$(date +%Y.%m.%d)-x86_64.iso}"
 
@@ -110,8 +110,8 @@ echo "::group::4. Install our kernel + initramfs into rootfs"
 KOUT="$NOVAI_ROOT/build/out-kernel"
 if [[ -f "$KOUT/vmlinuz-novai" ]]; then
   install -D -m0644 "$KOUT/vmlinuz-novai" "$ROOTFS/boot/vmlinuz-novai"
-  install -D -m0644 "$KOUT/System.map-novai" "$ROOTFS/boot/System.map-novai"
-  install -D -m0644 "$KOUT/config-novai" "$ROOTFS/boot/config-novai"
+  install -D -m0644 "$KOUT/System.map-novai" "$ROOTFS/boot/System.map-novai" 2>/dev/null || true
+  install -D -m0644 "$KOUT/config-novai" "$ROOTFS/boot/config-novai" 2>/dev/null || true
 fi
 if [[ -d "$NOVAI_ROOT/build/modules/lib/modules" ]]; then
   cp -a "$NOVAI_ROOT/build/modules/lib/modules" "$ROOTFS/lib/"
