@@ -1,0 +1,62 @@
+# =============================================================================
+# NovaiOS — Self-healing auto-fix workflow.
+# -----------------------------------------------------------------------------
+# Triggered by build-iso.yml when the main pipeline fails. Runs
+# scripts/auto-fix.py which:
+#   1. Reads the most recent failed run logs via the GitHub API.
+#   2. Applies the matching fix rule.
+#   3. Commits and pushes the patch.
+#   4. The push itself re-triggers build-iso.yml.
+# To prevent infinite loops, this workflow will not re-run if the previous
+# commit on the branch was authored by `novai-bot`.
+# =============================================================================
+name: auto-fix
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["build-iso"]
+    types:     [completed]
+    branches:  [main]
+
+permissions:
+  contents: write
+  actions:  read
+  issues:   write
+
+jobs:
+  auto-fix:
+    name: Run auto-fix rules
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    if: ${{ github.event.workflow_run.conclusion == 'failure' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Prevent infinite loop (skip if last commit was by bot)
+        id: loop_guard
+        run: |
+          LAST_AUTHOR=$(git log -1 --pretty=%an)
+          echo "last author: $LAST_AUTHOR"
+          if [[ "$LAST_AUTHOR" == "novai-bot" ]]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run auto-fix
+        if: steps.loop_guard.outputs.skip == 'false'
+        env:
+          GH_TOKEN:   ${{ secrets.GITHUB_TOKEN }}
+          REPO:       ${{ github.repository }}
+          GIT_BRANCH: main
+        run: python3 scripts/auto-fix.py
+
+      - name: Summary (skipped)
+        if: steps.loop_guard.outputs.skip == 'true'
+        run: |
+          echo "Auto-fix skipped because the last commit was authored by novai-bot."
+          echo "A human needs to look at the latest failed run."

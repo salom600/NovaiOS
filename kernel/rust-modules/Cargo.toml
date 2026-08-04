@@ -1,0 +1,30 @@
+# =============================================================================
+# NovaiOS — Out-of-tree Rust Linux kernel module
+# -----------------------------------------------------------------------------
+# This is a real Rust-for-Linux (R4L) kernel module. It builds against a Linux
+# tree that has CONFIG_RUST=y enabled (Linux >= 6.1 with rust support). It is
+# built with the kernel makefile via `make M=kernel/rust-modules`, NOT cargo.
+#
+# Module name: novai_drv
+# Purpose    : lightweight power/perf hint driver + telemetry hook used by
+#              novai-services to keep the desktop responsive.
+# =============================================================================
+
+[package]
+name        = "novai_drv"
+version     = "0.1.0"
+edition     = "2021"
+license     = "GPL-2.0-only"
+description = "NovaiOS in-kernel Rust driver (power/perf hints + telemetry)"
+publish     = false
+
+[lib]
+crate-type = ["staticlib"]
+name       = "novai_drv"
+
+# ---- kernel-side crates are provided by the Linux tree, not crates.io ----
+[dependencies]
+
+# ---- These features are interpreted by the kernel build system ----
+[features]
+default = []

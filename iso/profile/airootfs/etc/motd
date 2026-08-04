@@ -1,0 +1,19 @@
+# NovaiOS welcome banner shown on first login to TTY 1.
+
+Welcome to NovaiOS 0.1 (live)
+================================
+
+  • Desktop session should auto-start on tty1
+  • If the GUI does not appear, switch to tty2 with Ctrl+Alt+F2 and run:
+        /usr/bin/novai-comp &
+        /usr/bin/novai-panel &
+  • To open the store, run:        novai-launcher --store
+  • To install a package:          novai-pkg install <name>
+  • To list installed packages:    novai-pkg list
+  • Settings GUI:                  novai-settings
+  • Documentation:                 https://github.com/salom600/NovaiOS
+
+Default user:  novai   (no password; sudo with NOPASSWD)
+Root password: not set
+
+Have fun.

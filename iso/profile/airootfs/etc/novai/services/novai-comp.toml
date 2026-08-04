@@ -1,0 +1,19 @@
+[unit]
+name = "novai-comp"
+desc = "Wayland compositor (NovaiOS)"
+after = ["seatd.service", "dbus.service", "pipewire.service"]
+
+[service]
+exec    = "/usr/bin/novai-comp"
+restart = "on-failure"
+user    = "novai"
+cwd     = "/home/novai"
+
+[service.env]
+WAYLAND_DISPLAY = "wayland-0"
+XDG_RUNTIME_DIR = "/run/user/1000"
+XDG_SESSION_TYPE = "wayland"
+NOVAI_COMP_LOG  = "info"
+
+[install]
+wanted_by = ["graphical.target"]

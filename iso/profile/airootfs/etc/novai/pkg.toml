@@ -1,0 +1,12 @@
+# /etc/novai/pkg.toml — novai-pkg configuration
+
+[backend]
+driver = "pacman"           # pacman | flatpak | apt (planned)
+pacman_conf = "/etc/pacman.conf"
+
+[store]
+enabled = true
+# Remote catalog index (signed). For v0.1 we ship a static catalog in
+# novai-launcher; v0.3 will fetch this URL on demand.
+# index_url = "https://store.novaios.org/catalog.json"
+# index_pubkey = "/etc/novai/store-key.asc"

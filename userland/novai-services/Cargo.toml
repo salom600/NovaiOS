@@ -1,0 +1,27 @@
+[package]
+name        = "novai-services"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+authors     = { workspace = true }
+description = "NovaiOS service manager (Rust replacement for systemd unit supervision)"
+publish     = false
+
+[[bin]]
+name = "novai-services"
+path = "src/main.rs"
+
+[dependencies]
+anyhow             = { workspace = true }
+log                = { workspace = true }
+env_logger         = { workspace = true }
+nix                = { workspace = true }
+serde              = { workspace = true }
+serde_json         = { workspace = true }
+toml               = { workspace = true }
+clap               = { workspace = true }
+tokio              = { workspace = true, features = ["rt-multi-thread", "macros", "signal", "process", "fs", "io-util", "time", "net"] }
+tracing            = { workspace = true }
+tracing-subscriber = { workspace = true }
+which              = { workspace = true }
+walkdir            = { workspace = true }

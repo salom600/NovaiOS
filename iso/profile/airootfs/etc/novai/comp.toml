@@ -1,0 +1,31 @@
+# NovaiOS comp config — consumed by novai-comp.
+[output]
+width    = 1920
+height   = 1080
+refresh  = 60
+scale    = 1.0
+transform = "normal"
+
+[background]
+color = [16, 18, 28]
+image = "/usr/share/novai/wallpapers/default.png"
+
+[input]
+tap_to_click   = true
+natural_scroll = true
+accel_profile  = "adaptive"
+repeat_rate    = 25
+repeat_delay   = 250
+
+workspaces = 4
+
+[[autostart]]
+exec = "/usr/bin/novai-panel"
+[[autostart]]
+exec = "/usr/bin/novai-lock --daemon"
+[[autostart]]
+exec = "/usr/bin/pipewire"
+[[autostart]]
+exec = "/usr/bin/pipewire-pulse"
+[[autostart]]
+exec = "/usr/bin/wireplumber"

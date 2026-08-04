@@ -1,0 +1,16 @@
+[unit]
+name = "novai-panel"
+desc = "NovaiOS top panel"
+after = ["novai-comp.service"]
+
+[service]
+exec    = "/usr/bin/novai-panel"
+restart = "on-failure"
+user    = "novai"
+
+[service.env]
+WAYLAND_DISPLAY = "wayland-0"
+XDG_RUNTIME_DIR = "/run/user/1000"
+
+[install]
+wanted_by = ["graphical.target"]

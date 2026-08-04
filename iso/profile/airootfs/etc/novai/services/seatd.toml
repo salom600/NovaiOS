@@ -1,0 +1,13 @@
+# novai-services unit: bring up seatd (libseat)
+[unit]
+name = "seatd"
+desc = "Seat management daemon"
+after = ["dbus.service"]
+
+[service]
+exec    = "/usr/bin/seatd -g seat"
+restart = "always"
+user    = "root"
+
+[install]
+wanted_by = ["graphical.target"]

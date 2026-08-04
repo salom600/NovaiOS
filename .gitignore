@@ -1,0 +1,41 @@
+# Build outputs
+/build/
+/target/
+**/*.rs.bk
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Secrets — NEVER commit tokens
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Kernel source cache
+build/linux/
+build/out-kernel/
+build/modules/
+build/iso-work/
+build/out/
+
+# Local test ISOs
+*.iso
+*.img
+*.squashfs
+!iso/profile/**/*
+
+# Rust
+Cargo.lock.bak
+
+# Python
+__pycache__/
+*.pyc
+.venv/

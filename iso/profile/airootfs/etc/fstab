@@ -1,0 +1,12 @@
+# NovaiOS — fstab for live ISO overlay root
+# The actual mounts are set up by novai-init at boot.
+
+# <device>            <mount>  <type>    <options>                                <dump> <pass>
+overlay               /        overlay   defaults,x-systemd.requires=run-novai-sqfs,lowerdir=/run/novai/sqfs,upperdir=/run/novai/upper,workdir=/run/novai/work  0 1
+tmpfs                 /tmp     tmpfs     nosuid,nodev,mode=1777,size=25%           0 0
+tmpfs                 /run     tmpfs     nosuid,nodev,mode=755,size=25%           0 0
+proc                  /proc    proc      nosuid,noexec,nodev                      0 0
+sysfs                 /sys     sysfs     nosuid,noexec,nodev                      0 0
+devtmpfs              /dev     devtmpfs  mode=0755,nosuid,size=4M                 0 0
+devpts                /dev/pts devpts    gid=5,mode=620,ptmxmode=0666,nosuid,noexec 0 0
+tmpfs                 /dev/shm tmpfs     nosuid,nodev,mode=1777,size=10%          0 0

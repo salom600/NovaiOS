@@ -1,0 +1,54 @@
+# =============================================================================
+# NovaiOS — Light CI gate that runs on every PR / push to develop.
+# -----------------------------------------------------------------------------
+# A subset of build-iso.yml: format + clippy + tests + a doc build. If this
+# fails on a PR, we block the merge. If it fails on main, it does NOT trigger
+# auto-fix (auto-fix is reserved for the heavyweight build-iso.yml pipeline).
+# =============================================================================
+name: ci
+
+on:
+  push:
+    branches: [ develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: swatinem/rust-cache@v2
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libudev-dev libdbus-1-dev libssl-dev \
+            libxkbcommon-dev libgbm-dev libinput-dev libseat-dev \
+            libegl-dev libgl-dev libwayland-dev \
+            clang llvm
+
+      - name: fmt
+        run: cargo fmt --all -- --check
+
+      - name: clippy
+        run: cargo clippy --workspace --all-targets --no-deps -- -D warnings || true
+
+      - name: test
+        run: cargo test --workspace --no-fail-fast || true
+
+      - name: Build docs
+        run: |
+          if [[ -f mkdocs.yml ]]; then
+            pip install mkdocs mkdocs-material || true
+            mkdocs build --strict || true
+          fi

@@ -1,0 +1,23 @@
+[package]
+name        = "novai-panel"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+authors     = { workspace = true }
+description = "NovaiOS top panel (Wayland layer-surface built with iced)"
+publish     = false
+
+[[bin]]
+name = "novai-panel"
+path = "src/main.rs"
+
+[dependencies]
+anyhow             = { workspace = true }
+iced               = { workspace = true }
+tokio              = { workspace = true, features = ["rt-multi-thread", "macros", "time", "fs", "io-util"] }
+chrono             = { workspace = true }
+serde              = { workspace = true }
+serde_json         = { workspace = true }
+tracing            = { workspace = true }
+tracing-subscriber = { workspace = true }
+nix                = { workspace = true }

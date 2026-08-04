@@ -1,0 +1,9 @@
+NovaiOS is licensed under either of
+  • Apache License, Version 2.0   (LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0)
+  • MIT License                   (LICENSE-MIT  or http://opensource.org/licenses/MIT)
+  • GNU General Public License v3 (LICENSE-GPL  or https://www.gnu.org/licenses/gpl-3.0.html)
+
+at your option.
+
+The Linux kernel portion (kernel/rust-modules/) is licensed GPL-2.0-only to
+remain compatible with the upstream kernel linking model.

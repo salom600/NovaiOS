@@ -1,0 +1,12 @@
+[unit]
+name = "dbus"
+desc = "D-Bus system bus"
+after = []
+
+[service]
+exec    = "/usr/bin/dbus-daemon --system --nofork --nopidfile"
+restart = "always"
+user    = "root"
+
+[install]
+wanted_by = ["multi-user.target", "graphical.target"]

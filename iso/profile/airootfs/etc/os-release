@@ -1,0 +1,11 @@
+NAME="NovaiOS"
+ID=novai
+ID_LIKE=arch
+PRETTY_NAME="NovaiOS 0.1 (live)"
+VERSION="0.1"
+VERSION_ID=0.1
+ANSI_COLOR="0;35"
+HOME_URL="https://github.com/salom600/NovaiOS"
+DOCUMENTATION_URL="https://github.com/salom600/NovaiOS/tree/main/docs"
+SUPPORT_URL="https://github.com/salom600/NovaiOS/issues"
+BUG_REPORT_URL="https://github.com/salom600/NovaiOS/issues"

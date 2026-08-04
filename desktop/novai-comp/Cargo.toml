@@ -1,0 +1,24 @@
+[package]
+name        = "novai-comp"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+authors     = { workspace = true }
+description = "NovaiOS Wayland compositor (built on Smithay)"
+publish     = false
+
+[[bin]]
+name = "novai-comp"
+path = "src/main.rs"
+
+[dependencies]
+anyhow             = { workspace = true }
+smithay            = { workspace = true }
+tracing            = { workspace = true }
+tracing-subscriber = { workspace = true }
+nix                = { workspace = true }
+libc               = { workspace = true }
+clap               = { workspace = true }
+serde              = { workspace = true }
+serde_json         = { workspace = true }
+image              = { workspace = true }

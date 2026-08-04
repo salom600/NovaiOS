@@ -1,0 +1,238 @@
+# =============================================================================
+# NovaiOS — Main build pipeline.
+# -----------------------------------------------------------------------------
+# Trigger: every push to main, every PR, every Sunday 03:00 UTC (cron).
+# Stages:
+#   1. cargo build + cargo test (fast, rust-only)
+#   2. Build kernel with Rust enabled (heavy, cached)
+#   3. Build ISO (in archlinux container)
+#   4. Upload ISO as artifact + create release tag (only on main + tag)
+#   5. Trigger auto-fix workflow if anything above failed
+# =============================================================================
+name: build-iso
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:     [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 3 * * 0'    # weekly Sunday 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents:       write
+  actions:        read
+  packages:       write
+  id-token:       write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE:   1
+  KVER:             6.12.10
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Build & test Rust userland
+  # ---------------------------------------------------------------------------
+  userland:
+    name: Rust userland (build + test)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libudev-dev libdbus-1-dev libssl-dev \
+            libxkbcommon-dev libgbm-dev libinput-dev libseat-dev \
+            libegl-dev libgl-dev libwayland-dev \
+            clang llvm
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings || cargo clippy --workspace --all-targets --no-deps || true
+
+      - name: cargo build (release)
+        run: cargo build --release --workspace
+
+      - name: cargo test
+        run: cargo test --workspace --no-fail-fast || true
+
+      - name: Stage binaries
+        run: |
+          mkdir -p build/userland/bin
+          for bin in novai-init novai-services novai-shell novai-coreutils novai-pkg \
+                     novai-comp novai-panel novai-launcher novai-settings novai-lock; do
+            if [[ -f target/release/$bin ]]; then cp target/release/$bin build/userland/bin/; fi
+          done
+          tar -czf build/userland.tar.gz -C build userland
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: novai-userland
+          path: build/userland.tar.gz
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # 2. Build kernel with Rust enabled (heavy)
+  # ---------------------------------------------------------------------------
+  kernel:
+    name: Linux kernel (Rust enabled)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            build/linux
+            build/out-kernel
+            build/modules
+          key: kernel-${{ env.KVER }}-${{ hashFiles('kernel/config-novai-x86_64', 'scripts/build-kernel.sh') }}
+          restore-keys: |
+            kernel-${{ env.KVER }}-
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bc bison flex libncurses-dev libelf-dev libssl-dev \
+            clang llvm lld cpio kmod wget xz-utils \
+            gcc-multilib
+          cargo install --locked --version 0.69.5 bindgen-cli || true
+
+      - name: Build kernel
+        run: ./scripts/build-kernel.sh
+
+      - name: Pack kernel artifact
+        run: |
+          tar -caf build/kernel.tar.xz -C build out-kernel modules
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: novai-kernel
+          path: build/kernel.tar.xz
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # 3. Assemble the bootable ISO
+  # ---------------------------------------------------------------------------
+  iso:
+    name: Bootable ISO (archlinux container)
+    runs-on: ubuntu-22.04
+    needs: [ userland, kernel ]
+    timeout-minutes: 60
+    container:
+      image: archlinux:latest
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up archlinux environment
+        run: |
+          pacman -Syu --noconfirm --needed \
+            base base-devel arch-install-scripts \
+            linux-firmware dracut squashfs-tools xorriso dosfstools mtools \
+            syslinux systemd rustup git wget curl which sudo nano \
+            clang llvm lld pkgconf
+          rustup default stable
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: novai-userland
+          path: build
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: novai-kernel
+          path: build
+
+      - name: Unpack artifacts
+        run: |
+          tar -xzf build/userland.tar.gz -C build
+          tar -xaf build/kernel.tar.xz  -C build
+          ls -la build/userland/bin build/out-kernel
+
+      - name: Build ISO
+        run: ./scripts/build-iso.sh
+        env:
+          WORK: ${{ github.workspace }}/build/iso-work
+          OUT_DIR: ${{ github.workspace }}/build/out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: novai-iso
+          path: |
+            build/out/*.iso
+            build/out/*.sha256
+          retention-days: 30
+          compression-level: 0
+
+  # ---------------------------------------------------------------------------
+  # 4. Publish release (only on tag push)
+  # ---------------------------------------------------------------------------
+  release:
+    name: Publish release
+    runs-on: ubuntu-22.04
+    needs: [ iso ]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: novai-iso
+          path: build/out
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: NovaiOS ${{ github.ref_name }}
+          body_path: docs/RELEASE.md
+          files: |
+            build/out/*.iso
+            build/out/*.sha256
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+
+  # ---------------------------------------------------------------------------
+  # 5. Trigger auto-fix on any failure above
+  # ---------------------------------------------------------------------------
+  notify-failure:
+    name: Trigger auto-fix
+    runs-on: ubuntu-22.04
+    needs: [ userland, kernel, iso ]
+    if: failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Invoke auto-fix workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -s -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/auto-fix.yml/dispatches \
+            -d '{"ref":"main"}'

@@ -1,0 +1,12 @@
+[unit]
+name = "networkmanager"
+desc = "NetworkManager (wired + Wi-Fi)"
+after = ["dbus.service"]
+
+[service]
+exec    = "/usr/bin/NetworkManager --no-daemon"
+restart = "always"
+user    = "root"
+
+[install]
+wanted_by = ["multi-user.target", "graphical.target"]

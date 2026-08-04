@@ -1,0 +1,27 @@
+[package]
+name        = "novai-pkg"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+authors     = { workspace = true }
+description = "NovaiOS package manager — single-click install via pacman + Rust front-end"
+publish     = false
+
+[[bin]]
+name = "novai-pkg"
+path = "src/main.rs"
+
+[dependencies]
+anyhow             = { workspace = true }
+clap               = { workspace = true }
+serde              = { workspace = true }
+serde_json         = { workspace = true }
+toml               = { workspace = true }
+tokio              = { workspace = true, features = ["rt-multi-thread", "macros", "process", "fs", "io-util"] }
+tracing            = { workspace = true }
+tracing-subscriber = { workspace = true }
+sha2               = { workspace = true }
+hex                = { workspace = true }
+reqwest            = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+dirs               = { workspace = true }
+walkdir            = { workspace = true }

@@ -1,0 +1,105 @@
+# =============================================================================
+# NovaiOS — Root Cargo Workspace
+# -----------------------------------------------------------------------------
+# A modern, Rust-native Linux distribution. This workspace builds every
+# userland component of NovaiOS from Rust source: the init system, shell,
+# coreutils, package manager, Wayland compositor, and the desktop shell.
+#
+# The Linux kernel itself is built separately (see kernel/ and
+# .github/workflows/build-iso.yml) because it requires the kernel build
+# system, not cargo.
+# =============================================================================
+
+[workspace]
+resolver = "2"
+members = [
+    # ---- Kernel-side Rust modules (out-of-tree; built with kernel makefile) ----
+    # "kernel/rust-modules",            # built via `make M=kernel/rust-modules`
+
+    # ---- Early-boot userland ----
+    "userland/novai-init",
+    "userland/novai-services",
+
+    # ---- Core userland ----
+    "userland/novai-coreutils",
+    "userland/novai-shell",
+    "userland/novai-pkg",
+
+    # ---- Desktop environment (Wayland) ----
+    "desktop/novai-comp",
+    "desktop/novai-panel",
+    "desktop/novai-launcher",
+    "desktop/novai-settings",
+    "desktop/novai-lock",
+]
+
+[workspace.package]
+version       = "0.1.0"
+edition       = "2021"
+license       = "GPL-3.0-or-later OR MIT"
+authors       = ["NovaiOS Project <novai@novaios.org>"]
+repository    = "https://github.com/salom600/NovaiOS"
+homepage      = "https://github.com/salom600/NovaiOS"
+documentation = "https://github.com/salom600/NovaiOS/tree/main/docs"
+readme        = "README.md"
+keywords      = ["linux", "os", "rust", "distribution", "wayland"]
+categories    = ["os"]
+
+[workspace.dependencies]
+# ---- Error / log ----
+anyhow       = { version = "1",    features = ["backtrace"] }
+thiserror    = { version = "1" }
+log          = { version = "0.4" }
+env_logger   = { version = "0.11" }
+tracing      = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# ---- Async runtime ----
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# ---- Serialization ----
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# ---- CLI ----
+clap = { version = "4", features = ["derive", "env", "wrap_help"] }
+
+# ---- System / OS ----
+nix = { version = "0.29", features = ["fs", "process", "signal", "user", "mount", "sched", "term"] }
+libc = "0.2"
+which = "6"
+
+# ---- Wayland / graphics (desktop only) ----
+smithay = { version = "0.3", default-features = false, features = ["use_system_lib", "backend_drm", "backend_gbm", "backend_egl", "backend_libinput", "backend_session_libseat", "backend_udev", "backend_wl", "backend_x11", "desktop", "renderer_glow", "renderer_multi", "wayland_protocols"] }
+wayland-client = "0.31"
+xkbcommon = "0.7"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+
+# ---- UI toolkit (for panel, launcher, settings, lock) ----
+iced = { version = "0.12", features = ["wayland", "tokio", "image", "svg", "advanced", "lazy"] }
+
+# ---- Misc ----
+dirs = "5"
+walkdir = "2"
+glob = "0.3"
+sha2 = "0.10"
+hex = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+once_cell = "1"
+
+[profile.release]
+opt-level     = 3
+lto           = "fat"
+codegen-units = 1
+strip         = "symbols"
+panic         = "abort"
+debug         = false
+
+[profile.release-debug]
+inherits = "release"
+strip    = false
+debug    = true

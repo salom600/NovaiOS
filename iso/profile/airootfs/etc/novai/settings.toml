@@ -1,0 +1,5 @@
+# NovaiOS settings — consumed by novai-settings.
+accent   = "#7c3aed"
+wallpaper = "/usr/share/novai/wallpapers/default.png"
+dark_mode = true
+perf_mode = "balanced"

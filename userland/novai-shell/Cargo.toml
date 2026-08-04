@@ -1,0 +1,23 @@
+[package]
+name        = "novai-shell"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+authors     = { workspace = true }
+description = "NovaiOS shell — friendly REPL with built-in common commands"
+publish     = false
+
+[[bin]]
+name = "novai-shell"
+path = "src/main.rs"
+
+[dependencies]
+anyhow     = { workspace = true }
+rustyline  = "14"
+nix        = { workspace = true }
+which      = { workspace = true }
+dirs       = { workspace = true }
+chrono     = { workspace = true }
+serde_json = { workspace = true }
+colored    = "2"
+unicode-width = "0.2"

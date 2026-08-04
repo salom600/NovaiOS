@@ -1,0 +1,16 @@
+[unit]
+name = "novai-lock"
+desc = "Login greeter + screen locker daemon"
+after = ["novai-comp.service"]
+
+[service]
+exec    = "/usr/bin/novai-lock --daemon"
+restart = "always"
+user    = "novai"
+
+[service.env]
+WAYLAND_DISPLAY = "wayland-0"
+XDG_RUNTIME_DIR = "/run/user/1000"
+
+[install]
+wanted_by = ["graphical.target"]
