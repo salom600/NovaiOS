@@ -55,7 +55,22 @@ make LLVM=1 ARCH=$ARCH olddefconfig </dev/null
 echo "::endgroup::"
 
 echo "::group::Build kernel"
-make LLVM=1 ARCH=$ARCH -j"$JOBS" bzImage modules
+# Try building with Rust enabled first. If the Rust toolchain doesn't match
+# what the kernel expects (common — R4L is tightly pinned), fall back to
+# building without CONFIG_RUST so we still produce a working kernel.
+make LLVM=1 ARCH=$ARCH -j"$JOBS" bzImage modules 2>&1 | tee /tmp/kbuild.log
+KBUILD_RC=${PIPESTATUS[0]}
+if [[ $KBUILD_RC -ne 0 ]]; then
+  if grep -q "unknown unstable option\|Rust.*not available\|CONFIG_RUST" /tmp/kbuild.log; then
+    echo "::warning::Rust kernel build failed (toolchain mismatch) — retrying without CONFIG_RUST"
+    scripts/config --disable CONFIG_RUST --disable CONFIG_BUILD_RUST
+    make LLVM=1 ARCH=$ARCH olddefconfig </dev/null
+    make LLVM=1 ARCH=$ARCH -j"$JOBS" bzImage modules
+  else
+    echo "::error::kernel build failed for non-Rust reason"
+    exit 1
+  fi
+fi
 echo "::endgroup::"
 
 echo "::group::Install kernel"

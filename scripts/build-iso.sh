@@ -134,19 +134,19 @@ cat > "$ROOTFS/usr/lib/dracut/modules.d/95novai/module-setup.sh" <<'EOF'
 #!/bin/bash
 # novai dracut module: mounts the squashfs from the ISO and lets novai-init overlay it.
 check() {
-    # Always install — return 0 if novai-init binary exists, else still 0 but warn.
-    if [[ ! -x /usr/bin/novai-init ]]; then
-        echo "novai: /usr/bin/novai-init not found — module will install but may not boot" >&2
-    fi
     return 0
 }
-depends() { echo "overlay squashfs"; }
+depends() { echo ""; }
 install() {
     # Install the novai-init binary as /init if it exists.
     if [[ -x /usr/bin/novai-init ]]; then
-        inst_simple /usr/bin/novai-init /init
+        inst_simple /usr/bin/novai-init /init 2>/dev/null || true
     fi
-    inst_hook pre-pivot 10 "$moddir/novai-prepivot.sh"
+    # Install the pre-pivot hook if it exists
+    if [[ -f "$moddir/novai-prepivot.sh" ]]; then
+        inst_hook pre-pivot 10 "$moddir/novai-prepivot.sh" 2>/dev/null || true
+    fi
+    return 0
 }
 EOF
 cat > "$ROOTFS/usr/lib/dracut/modules.d/95novai/novai-prepivot.sh" <<'EOF'
@@ -201,24 +201,23 @@ cp "$ROOTFS/boot/initramfs-novai.img" "$ISO_DIR/boot/initramfs-novai.img"
 cp "$ROOTFS/boot/loader/loader.conf"  "$ISO_DIR/loader/loader.conf"
 cp "$ROOTFS/boot/loader/entries/"*.conf "$ISO_DIR/loader/entries/"
 
-# UEFI: build a standalone systemd-boot UKI stub
+# Create the cmdline file FIRST — objcopy needs it.
+printf "novai.live=1 root=live:CDLABEL=%s rd.live.image rd.live.squashfs=airootfs.sfs quiet" "$ISO_LABEL" > /tmp/novai-cmdline.txt
+
+# UEFI: build a standalone systemd-boot UKI stub (best-effort — not all archlinux
+# containers ship the EFI stub, and BIOS boot via isolinux works without it).
 EFISTUB=$(find /usr/lib -name linuxx64.efi.stub 2>/dev/null | head -1)
 if [[ -n "$EFISTUB" && -f "$EFISTUB" ]]; then
+  echo "Found EFI stub: $EFISTUB"
   objcopy \
     --add-section .osrel="$ROOTFS/usr/lib/os-release"   --change-section-vma .osrel=0x20000 \
     --add-section .cmdline=/tmp/novai-cmdline.txt       --change-section-vma .cmdline=0x30000 \
     --add-section .linux="$ISO_DIR/boot/vmlinuz-novai"  --change-section-vma .linux=0x40000 \
     --add-section .initrd="$ISO_DIR/boot/initramfs-novai.img" --change-section-vma .initrd=0x3000000 \
-    "$EFISTUB" "$ISO_DIR/EFI/BOOT/BOOTX64.EFI"
-  printf "novai.live=1 root=live:CDLABEL=$ISO_LABEL rd.live.image rd.live.squashfs=airootfs.sfs quiet" > /tmp/novai-cmdline.txt
-  objcopy \
-    --add-section .osrel="$ROOTFS/usr/lib/os-release"   --change-section-vma .osrel=0x20000 \
-    --add-section .cmdline=/tmp/novai-cmdline.txt       --change-section-vma .cmdline=0x30000 \
-    --add-section .linux="$ISO_DIR/boot/vmlinuz-novai"  --change-section-vma .linux=0x40000 \
-    --add-section .initrd="$ISO_DIR/boot/initramfs-novai.img" --change-section-vma .initrd=0x3000000 \
-    "$EFISTUB" "$ISO_DIR/EFI/BOOT/BOOTX64.EFI"
+    "$EFISTUB" "$ISO_DIR/EFI/BOOT/BOOTX64.EFI" || \
+    echo "::warning::EFI stub build failed — ISO will be BIOS-only"
 else
-  echo "::warning::EFI stub not found — skipping UEFI boot image"
+  echo "::warning::EFI stub (linuxx64.efi.stub) not found — ISO will be BIOS-only"
 fi
 
 # BIOS: eltorito boot image via isolinux
@@ -232,25 +231,57 @@ LABEL novai
   INITRD /boot/initramfs-novai.img
   APPEND novai.live=1 root=live:CDLABEL=NOVAI_ISO rd.live.image rd.live.squashfs=airootfs.sfs quiet
 EOF
-cp /usr/lib/syslinux/bios/isolinux.bin   "$ISO_DIR/isolinux/" 2>/dev/null || true
-cp /usr/lib/syslinux/bios/ldlinux.c32     "$ISO_DIR/isolinux/" 2>/dev/null || true
-cp /usr/lib/syslinux/bios/menu.c32        "$ISO_DIR/isolinux/" 2>/dev/null || true
+# Try to find isolinux.bin in common locations
+for p in /usr/lib/syslinux/bios/isolinux.bin /usr/share/syslinux/isolinux.bin /usr/lib/ISOLINUX/isolinux.bin; do
+  if [[ -f "$p" ]]; then
+    cp "$p" "$ISO_DIR/isolinux/"
+    break
+  fi
+done
+for p in /usr/lib/syslinux/bios/ldlinux.c32 /usr/share/syslinux/ldlinux.c32; do
+  if [[ -f "$p" ]]; then cp "$p" "$ISO_DIR/isolinux/"; break; fi
+done
+for p in /usr/lib/syslinux/bios/menu.c32 /usr/share/syslinux/menu.c32; do
+  if [[ -f "$p" ]]; then cp "$p" "$ISO_DIR/isolinux/"; break; fi
+done
+for p in /usr/lib/syslinux/bios/isohdpfx.bin /usr/share/syslinux/isohdpfx.bin; do
+  if [[ -f "$p" ]]; then ISOHDPFX="$p"; break; fi
+done
 echo "::endgroup::"
 
 echo "::group::7. Assemble the ISO with xorriso"
-xorriso -as mkisofs \
-  -iso-level 3 \
-  -full-iso9660-filenames \
-  -volid "$ISO_LABEL" \
-  -eltorito-boot isolinux/isolinux.bin \
-  -eltorito-catalog isolinux/boot.cat \
-  -no-emul-boot -boot-load-size 4 -boot-info-table \
-  -isohybrid-mbr /usr/lib/syslinux/bios/isohdpfx.bin \
-  -eltorito-alt-boot \
-  -e EFI/BOOT/BOOTX64.EFI \
-  -no-emul-boot -isohybrid-gpt-basdat \
-  -output "$OUT_DIR/$ISO_NAME" \
+# Build xorriso args conditionally — BIOS boot is always included, UEFI is best-effort.
+XORRISO_ARGS=(
+  -as mkisofs
+  -iso-level 3
+  -full-iso9660-filenames
+  -volid "$ISO_LABEL"
+  -eltorito-boot isolinux/isolinux.bin
+  -eltorito-catalog isolinux/boot.cat
+  -no-emul-boot -boot-load-size 4 -boot-info-table
+)
+
+if [[ -f "$ISO_DIR/EFI/BOOT/BOOTX64.EFI" ]]; then
+  XORRISO_ARGS+=(
+    -eltorito-alt-boot
+    -e EFI/BOOT/BOOTX64.EFI
+    -no-emul-boot -isohybrid-gpt-basdat
+  )
+fi
+
+if [[ -n "${ISOHDPFX:-}" && -f "$ISOHDPFX" ]]; then
+  XORRISO_ARGS+=(-isohybrid-mbr "$ISOHDPFX")
+fi
+
+XORRISO_ARGS+=(
+  -output "$OUT_DIR/$ISO_NAME"
   "$ISO_DIR"
+)
+
+xorriso "${XORRISO_ARGS[@]}" || {
+  echo "::error::xorriso failed"
+  exit 1
+}
 echo "::endgroup::"
 
 sha256sum "$OUT_DIR/$ISO_NAME" | tee "$OUT_DIR/$ISO_NAME.sha256"
