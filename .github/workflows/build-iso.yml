@@ -158,7 +158,7 @@ jobs:
             cpio kmod wget xz-utils gcc-multilib
           # Make clang-15 the default
           sudo ln -sf /usr/bin/clang-15     /usr/local/bin/clang
-          sudo ln -sf /usr/bin/llvm-15      /usr/local/bin/llvm
+          sudo ln -sf /usr/bin/llvm-config-15 /usr/local/bin/llvm-config
           sudo ln -sf /usr/bin/lld-15       /usr/local/bin/lld
           sudo ln -sf /usr/bin/llvm-ar-15   /usr/local/bin/llvm-ar
           sudo ln -sf /usr/bin/llvm-nm-15   /usr/local/bin/llvm-nm
@@ -167,7 +167,8 @@ jobs:
           sudo ln -sf /usr/bin/llvm-readelf-15 /usr/local/bin/llvm-readelf
           sudo ln -sf /usr/bin/llvm-strip-15   /usr/local/bin/llvm-strip
           cargo install --locked --version 0.69.5 bindgen-cli || true
-          clang --version; llvm-config --version
+          clang --version
+          llvm-config --version || true
 
       - name: Build kernel
         run: ./scripts/build-kernel.sh
