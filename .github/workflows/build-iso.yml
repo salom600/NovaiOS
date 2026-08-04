@@ -28,8 +28,8 @@ permissions:
   id-token:       write
 
 concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
+  group: build-${{ github.ref }}-${{ github.run_id }}
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
