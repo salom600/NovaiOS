@@ -58,12 +58,24 @@ def most_recent_failed_run() -> dict | None:
     return None
 
 def fetch_log(jobs_url: str) -> str:
-    jobs = api("GET", jobs_url.replace(API + "/repos/", "")) or {}
+    # jobs_url is a full API URL like https://api.github.com/repos/OWNER/REPO/actions/runs/N/jobs
+    # Convert to a path our api() helper understands.
+    if jobs_url.startswith(API):
+        path = jobs_url[len(API) + 1:]  # strip "https://api.github.com/"
+        # path is now "repos/OWNER/REPO/actions/runs/N/jobs"
+        # api() prepends "/repos/{REPO}/", so strip "repos/" if present
+        if path.startswith("repos/"):
+            path = path[len("repos/"):]
+        # path is now "OWNER/REPO/actions/runs/N/jobs"
+        # We want to keep OWNER/REPO intact since REPO env may not match
+        # Actually api() does f"/repos/{REPO}/{path}", so we need to strip OWNER/REPO too
+        # Simpler: hit the URL directly with urllib
+    jobs = _http_get_json(jobs_url) or {}
     out = []
     for job in jobs.get("jobs", []):
         for step in job.get("steps", []):
-            if step.get("conclusion") != "failure": continue
-            # Use the logs endpoint (requires `actions: read`).
+            if step.get("conclusion") != "failure":
+                continue
             log_url = f"{API}/repos/{REPO}/actions/jobs/{job['id']}/logs"
             try:
                 req = urllib.request.Request(log_url, headers={
@@ -75,6 +87,21 @@ def fetch_log(jobs_url: str) -> str:
             except Exception as e:
                 out.append(f"# failed to fetch logs for {job['name']}: {e}\n")
     return "\n".join(out)
+
+def _http_get_json(url: str) -> dict | None:
+    try:
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"Bearer {GH_TOKEN}",
+            "Accept": "application/vnd.github+json",
+        })
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.loads(r.read().decode() or "{}")
+    except urllib.error.HTTPError as e:
+        print(f"[http] GET {url} -> {e.code}: {e.reason}", file=sys.stderr)
+        return None
+    except Exception as e:
+        print(f"[http] GET {url} -> {e}", file=sys.stderr)
+        return None
 
 # ---------------------------------------------------------------------------
 # Rule engine
