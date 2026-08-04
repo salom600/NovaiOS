@@ -72,14 +72,14 @@ nix = { version = "0.29", features = ["fs", "process", "signal", "user", "mount"
 libc = "0.2"
 which = "6"
 
-# ---- Wayland / graphics (desktop only) ----
-smithay = { version = "0.3", default-features = false, features = ["use_system_lib", "backend_drm", "backend_gbm", "backend_egl", "backend_libinput", "backend_session_libseat", "backend_udev", "backend_wl", "backend_x11", "desktop", "renderer_glow", "renderer_multi", "wayland_protocols"] }
+# ---- Wayland / graphics (desktop only, behind features) ----
+smithay = { version = "0.3", default-features = false }
 wayland-client = "0.31"
 xkbcommon = "0.7"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 # ---- UI toolkit (for panel, launcher, settings, lock) ----
-iced = { version = "0.12", features = ["wayland", "tokio", "image", "svg", "advanced", "lazy"] }
+iced = { version = "0.12", default-features = false, features = ["tokio", "advanced", "lazy"] }
 
 # ---- Misc ----
 dirs = "5"

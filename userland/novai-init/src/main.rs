@@ -16,9 +16,7 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use nix::mount::{mount, MsFlags};
-use nix::sched::{pivot_root, unshare, CloneFlags};
-use nix::sys::stat::Mode;
-use nix::unistd::{chdir, chroot, execve, getppid, mkdir, Pid};
+use nix::unistd::{chdir, execve, getppid, Pid};
 use std::collections::HashMap;
 use std::env;
 use std::ffi::CString;
@@ -36,16 +34,24 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() -> Result<()> {
     init_logging();
-    info!("novai-init v{} starting (pid {})", VERSION, std::process::id());
+    info!(
+        "novai-init v{} starting (pid {})",
+        VERSION,
+        std::process::id()
+    );
 
     if Pid::this().as_raw() != 1 {
-        warn!("novai-init is not PID 1 (got pid {}); running in helper mode",
-              Pid::this());
+        warn!(
+            "novai-init is not PID 1 (got pid {}); running in helper mode",
+            Pid::this()
+        );
     }
 
     let cmd = Cmdline::parse().unwrap_or_default();
-    info!("cmdline: live={}, root={:?}, init={:?}",
-          cmd.live, cmd.root, cmd.init);
+    info!(
+        "cmdline: live={}, root={:?}, init={:?}",
+        cmd.live, cmd.root, cmd.init
+    );
 
     // ---- 1. Mount the API filesystems needed to even read /proc/cmdline ----
     mountfs::mount_early()?;
@@ -72,18 +78,29 @@ fn main() -> Result<()> {
 
 fn init_logging() {
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env()
-            .add_directive("novai_init=info".parse().unwrap()))
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("novai_init=info".parse().unwrap()),
+        )
         .with_writer(std::io::stderr)
         .init();
 }
 
 fn load_early_modules() -> Result<()> {
-    for m in &["overlay", "squashfs", "loop", "virtio_pci", "virtio_blk",
-               "ahci", "nvme", "ext4", "vfat", "isofs", "dm_mod"] {
-        let _ = std::process::Command::new("modprobe")
-            .arg(m)
-            .status();
+    for m in &[
+        "overlay",
+        "squashfs",
+        "loop",
+        "virtio_pci",
+        "virtio_blk",
+        "ahci",
+        "nvme",
+        "ext4",
+        "vfat",
+        "isofs",
+        "dm_mod",
+    ] {
+        let _ = std::process::Command::new("modprobe").arg(m).status();
     }
     Ok(())
 }
@@ -94,8 +111,8 @@ fn setup_live_root(cmd: &Cmdline, new_root: &Path) -> Result<()> {
     // Discover the ISO by looking for /.novai/live/filesystem.squashfs on any
     // mounted block device. dracut (initramfs) usually mounts the ISO at /run/initramfs/isoscandir
     // or auto-detects by label NOVAI_ISO.
-    let squashfs = find_squashfs()
-        .context("could not locate NovaiOS squashfs on any mounted device")?;
+    let squashfs =
+        find_squashfs().context("could not locate NovaiOS squashfs on any mounted device")?;
     info!("using squashfs: {}", squashfs.display());
 
     fs::create_dir_all(new_root)?;
@@ -110,7 +127,8 @@ fn setup_live_root(cmd: &Cmdline, new_root: &Path) -> Result<()> {
         Some("squashfs"),
         MsFlags::MS_RDONLY,
         None,
-    ).context("mount squashfs")?;
+    )
+    .context("mount squashfs")?;
 
     // Overlay tmpfs on top so the live session looks writable.
     mount::<str, str, str, str>(
@@ -119,13 +137,13 @@ fn setup_live_root(cmd: &Cmdline, new_root: &Path) -> Result<()> {
         Some("tmpfs"),
         MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
         Some("size=75%"),
-    ).context("mount live upper tmpfs")?;
+    )
+    .context("mount live upper tmpfs")?;
 
     let lower = "/run/novai/sqfs".to_string();
     let upper = "/run/novai/upper".to_string();
-    let work  = "/run/novai/work".to_string();
-    let opts  = format!("lowerdir={},upperdir={},workdir={}",
-                        lower, upper, work);
+    let work = "/run/novai/work".to_string();
+    let opts = format!("lowerdir={},upperdir={},workdir={}", lower, upper, work);
 
     mount::<str, str, str, str>(
         Some("overlay"),
@@ -133,7 +151,8 @@ fn setup_live_root(cmd: &Cmdline, new_root: &Path) -> Result<()> {
         Some("overlay"),
         MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
         Some(&opts),
-    ).context("mount overlay")?;
+    )
+    .context("mount overlay")?;
 
     // Copy resolv.conf, host name etc. into the new root.
     copy_runtime_files(new_root)?;
@@ -156,7 +175,8 @@ fn setup_real_root(spec: &str, new_root: &Path, _cmd: &Cmdline) -> Result<()> {
         Some(fst),
         MsFlags::empty(),
         opts.map(|s| s.to_string()).as_deref(),
-    ).with_context(|| format!("mount {} on {}", dev, new_root.display()))?;
+    )
+    .with_context(|| format!("mount {} on {}", dev, new_root.display()))?;
 
     // Mount /boot inside the new root if there's a separate ESP
     if Path::new("/dev/disk/by-label/NOVAI_BOOT").exists() {
@@ -177,7 +197,9 @@ fn copy_runtime_files(new_root: &Path) -> Result<()> {
     for f in &["/etc/resolv.conf", "/etc/hostname"] {
         if Path::new(f).exists() {
             let dest = new_root.join(f.trim_start_matches('/'));
-            if let Some(p) = dest.parent() { let _ = fs::create_dir_all(p); }
+            if let Some(p) = dest.parent() {
+                let _ = fs::create_dir_all(p);
+            }
             let _ = fs::copy(f, dest);
         }
     }
@@ -188,7 +210,9 @@ fn find_squashfs() -> Option<PathBuf> {
     // Order: kernel cmdline novai.squashfs= → /run/initramfs/live → by-label.
     if let Ok(s) = env::var("NOVAI_SQUASHFS") {
         let p = PathBuf::from(s);
-        if p.exists() { return Some(p); }
+        if p.exists() {
+            return Some(p);
+        }
     }
     for candidate in &[
         "/run/initramfs/live/filesystem.squashfs",
@@ -201,12 +225,18 @@ fn find_squashfs() -> Option<PathBuf> {
         }
     }
     // Scan mounted devices by label
-    for entry in fs::read_dir("/dev/disk/by-label").into_iter().flatten().flatten() {
+    for entry in fs::read_dir("/dev/disk/by-label")
+        .into_iter()
+        .flatten()
+        .flatten()
+    {
         let label = entry.file_name().to_string_lossy().to_string();
         if label.starts_with("NOVAI") {
             // Try mounting and looking for squashfs
             if let Ok(real) = fs::read_link(entry.path()) {
-                let abs = if real.is_absolute() { real } else {
+                let abs = if real.is_absolute() {
+                    real
+                } else {
                     PathBuf::from("/dev/disk/by-label").join(real)
                 };
                 let _ = try_mount_iso(&abs);
@@ -214,7 +244,8 @@ fn find_squashfs() -> Option<PathBuf> {
         }
     }
     // Last resort: re-scan after mounts
-    Path::new("/run/novai/iso/novai/live/filesystem.squashfs").exists()
+    Path::new("/run/novai/iso/novai/live/filesystem.squashfs")
+        .exists()
         .then(|| PathBuf::from("/run/novai/iso/novai/live/filesystem.squashfs"))
 }
 
@@ -264,9 +295,9 @@ fn do_switch_root(new_root: &Path, cmd: &Cmdline) -> Result<()> {
     // Use pivot_root(2): new_root and put_old must both be on same fs (here tmpfs+overlay).
     let put_old = new_root.join("oldroot");
     fs::create_dir_all(&put_old)?;
-    pivot_root(new_root, &put_old)
-        .context("pivot_root")?;
+    nix::unistd::pivot_root(new_root, &put_old).context("pivot_root")?;
     chdir("/")?;
+
     // Now / is the new root and the old initramfs is at /oldroot.
     // Unmount old initramfs to free RAM.
     let _ = nix::mount::umount2("/oldroot", nix::mount::MntFlags::MNT_DETACH);
@@ -280,19 +311,24 @@ fn exec_init(cmd: &Cmdline) -> Result<()> {
     info!("exec init: {}", init_path);
 
     if Path::new(&init_path).exists() {
-        let c_init  = CString::new(init_path.as_str())?;
+        let c_init = CString::new(init_path.as_str())?;
         let argv: Vec<CString> = vec![c_init.clone()];
-        let envp: Vec<CString> = vec![CString::new("HOME=/")?,
-                                       CString::new("TERM=linux")?,
-                                       CString::new("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")?];
-        execve(&c_init, &argv, &envp)
-            .context("execve init")?;
+        let envp: Vec<CString> = vec![
+            CString::new("HOME=/")?,
+            CString::new("TERM=linux")?,
+            CString::new("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")?,
+        ];
+        execve(&c_init, &argv, &envp).context("execve init")?;
     }
     // Fallback: try systemd then busybox sh
     for candidate in &["/lib/systemd/systemd", "/sbin/init", "/bin/sh"] {
         if Path::new(candidate).exists() {
             let c = CString::new(*candidate)?;
-            execve(&c, &[c.clone()], &[CString::new("PATH=/usr/sbin:/usr/bin:/sbin:/bin")?])?;
+            execve(
+                &c,
+                &[c.clone()],
+                &[CString::new("PATH=/usr/sbin:/usr/bin:/sbin:/bin")?],
+            )?;
         }
     }
     bail!("no init binary found in new root");

@@ -17,14 +17,14 @@ use std::fs;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Cmdline {
-    pub live:        bool,
-    pub root:        Option<String>,
-    pub init:        Option<String>,
-    pub swap:        Option<String>,
-    pub squashfs:    Option<String>,
-    pub debug:       bool,
-    pub no_overlay:  bool,
-    pub extra:       std::collections::HashMap<String, String>,
+    pub live: bool,
+    pub root: Option<String>,
+    pub init: Option<String>,
+    pub swap: Option<String>,
+    pub squashfs: Option<String>,
+    pub debug: bool,
+    pub no_overlay: bool,
+    pub extra: std::collections::HashMap<String, String>,
 }
 
 impl Cmdline {
@@ -43,19 +43,37 @@ impl Cmdline {
         for tok in raw.split_whitespace() {
             let (k, v) = match tok.split_once('=') {
                 Some((k, v)) => (k, Some(v)),
-                None         => (tok, None),
+                None => (tok, None),
             };
             match k {
-                "novai.live"        => c.live      = v.map(|x| x == "1" || x.eq_ignore_ascii_case("true")).unwrap_or(true),
-                "novai.root"        => c.root      = v.map(str::to_owned),
-                "novai.init"        => c.init      = v.map(str::to_owned),
-                "novai.swap"        => c.swap      = v.map(str::to_owned),
-                "novai.squashfs"    => c.squashfs  = v.map(str::to_owned),
-                "novai.debug"       => c.debug     = v.map(|x| x == "1").unwrap_or(true),
-                "novai.no_overlay"  => c.no_overlay = v.map(|x| x == "1").unwrap_or(true),
-                "init"              => { if c.init.is_none() { c.init = v.map(str::to_owned); } }
-                "root"              => { if c.root.is_none() { c.root = v.map(str::to_owned); } }
-                _ => { if let Some(v) = v { c.extra.insert(k.to_string(), v.to_string()); } else { c.extra.insert(k.to_string(), "1".to_string()); } }
+                "novai.live" => {
+                    c.live = v
+                        .map(|x| x == "1" || x.eq_ignore_ascii_case("true"))
+                        .unwrap_or(true)
+                }
+                "novai.root" => c.root = v.map(str::to_owned),
+                "novai.init" => c.init = v.map(str::to_owned),
+                "novai.swap" => c.swap = v.map(str::to_owned),
+                "novai.squashfs" => c.squashfs = v.map(str::to_owned),
+                "novai.debug" => c.debug = v.map(|x| x == "1").unwrap_or(true),
+                "novai.no_overlay" => c.no_overlay = v.map(|x| x == "1").unwrap_or(true),
+                "init" => {
+                    if c.init.is_none() {
+                        c.init = v.map(str::to_owned);
+                    }
+                }
+                "root" => {
+                    if c.root.is_none() {
+                        c.root = v.map(str::to_owned);
+                    }
+                }
+                _ => {
+                    if let Some(v) = v {
+                        c.extra.insert(k.to_string(), v.to_string());
+                    } else {
+                        c.extra.insert(k.to_string(), "1".to_string());
+                    }
+                }
             }
         }
         if c.debug {

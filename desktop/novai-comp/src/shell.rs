@@ -38,10 +38,15 @@ impl ShellState {
                 active: i == 0,
             });
         }
-        Self { workspaces, active_ws: 0 }
+        Self {
+            workspaces,
+            active_ws: 0,
+        }
     }
     pub fn switch(&mut self, idx: usize) {
-        if idx >= self.workspaces.len() { return; }
+        if idx >= self.workspaces.len() {
+            return;
+        }
         self.workspaces[self.active_ws].active = false;
         self.active_ws = idx;
         self.workspaces[idx].active = true;

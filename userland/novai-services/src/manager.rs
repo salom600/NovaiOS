@@ -12,19 +12,23 @@ use tracing::{error, info, warn};
 
 pub struct Manager {
     units_dir: PathBuf,
-    units:     HashMap<String, Unit>,
-    children:  HashMap<String, ChildHandle>,
+    units: HashMap<String, Unit>,
+    children: HashMap<String, ChildHandle>,
 }
 
 struct ChildHandle {
     child: Child,
-    unit:  Unit,
+    unit: Unit,
     stop_tx: oneshot::Sender<()>,
 }
 
 impl Manager {
     pub fn new(units_dir: PathBuf) -> Self {
-        Self { units_dir, units: HashMap::new(), children: HashMap::new() }
+        Self {
+            units_dir,
+            units: HashMap::new(),
+            children: HashMap::new(),
+        }
     }
 
     pub async fn load_all(&mut self) -> Result<()> {
@@ -37,7 +41,10 @@ impl Manager {
             let p = entry.path();
             if p.extension().and_then(|s| s.to_str()) == Some("toml") {
                 match Unit::load(&p) {
-                    Ok(u)  => { info!("loaded unit: {}", u.unit.name); self.units.insert(u.unit.name.clone(), u); }
+                    Ok(u) => {
+                        info!("loaded unit: {}", u.unit.name);
+                        self.units.insert(u.unit.name.clone(), u);
+                    }
                     Err(e) => error!("skip {}: {}", p.display(), e),
                 }
             }
@@ -48,7 +55,11 @@ impl Manager {
     pub fn list(&self) {
         println!("{:<24} {:<10} {}", "UNIT", "STATE", "DESCRIPTION");
         for (name, u) in &self.units {
-            let state = if self.children.contains_key(name) { "running" } else { "stopped" };
+            let state = if self.children.contains_key(name) {
+                "running"
+            } else {
+                "stopped"
+            };
             println!("{:<24} {:<10} {}", name, state, u.unit.desc);
         }
     }
@@ -60,7 +71,10 @@ impl Manager {
                 let running = self.children.contains_key(name);
                 println!("● {} - {}", u.unit.name, u.unit.desc);
                 println!("    Loaded:   ({})", u.path.display());
-                println!("    Active:   {} since boot", if running { "running" } else { "inactive" });
+                println!(
+                    "    Active:   {} since boot",
+                    if running { "running" } else { "inactive" }
+                );
                 println!("    Exec:     {}", u.service.exec);
                 println!("    Restart:  {:?}", u.service.restart);
             }
@@ -68,7 +82,10 @@ impl Manager {
     }
 
     pub async fn start(&mut self, name: &str) -> Result<()> {
-        let unit = self.units.get(name).cloned()
+        let unit = self
+            .units
+            .get(name)
+            .cloned()
             .ok_or_else(|| anyhow!("unknown unit {}", name))?;
 
         if self.children.contains_key(name) {
@@ -76,31 +93,46 @@ impl Manager {
             return Ok(());
         }
 
-        // Start deps first
+        // Start deps first — use Box::pin to break the async recursion.
         for dep in &unit.unit.after {
             if !self.children.contains_key(dep) && self.units.contains_key(dep) {
-                self.start(dep).await.ok();
+                Box::pin(self.start(dep)).await.ok();
             }
         }
 
         info!("starting {} (exec={})", name, unit.service.exec);
         let mut cmd = Command::new("/bin/sh");
         cmd.arg("-c").arg(&unit.service.exec);
-        cmd.stdin(Stdio::null()).stdout(Stdio::inherit()).stderr(Stdio::inherit());
-        if let Some(cwd) = &unit.service.cwd { cmd.current_dir(cwd); }
-        for (k, v) in &unit.service.env { cmd.env(k, v); }
+        cmd.stdin(Stdio::null())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit());
+        if let Some(cwd) = &unit.service.cwd {
+            cmd.current_dir(cwd);
+        }
+        for (k, v) in &unit.service.env {
+            cmd.env(k, v);
+        }
         if unit.service.user != "root" {
             cmd.uid(1000).gid(1000);
         }
 
         let child = cmd.spawn()?;
         let (stop_tx, _stop_rx) = oneshot::channel();
-        self.children.insert(name.to_string(), ChildHandle { child, unit: unit.clone(), stop_tx });
+        self.children.insert(
+            name.to_string(),
+            ChildHandle {
+                child,
+                unit: unit.clone(),
+                stop_tx,
+            },
+        );
         Ok(())
     }
 
     pub async fn stop(&mut self, name: &str) -> Result<()> {
-        let mut handle = self.children.remove(name)
+        let mut handle = self
+            .children
+            .remove(name)
             .ok_or_else(|| anyhow!("unit {} not running", name))?;
         info!("stopping {}", name);
         let _ = handle.child.start_kill();
@@ -111,11 +143,17 @@ impl Manager {
     /// Run as a supervisor: bring up everything that's `wanted_by` graphical.target,
     /// then poll children every 2s and restart on policy.
     pub async fn run(&mut self) -> Result<()> {
-        info!("novai-services supervisor running, {} units loaded", self.units.len());
+        info!(
+            "novai-services supervisor running, {} units loaded",
+            self.units.len()
+        );
 
         // Start everything wanted by default target.
-        let default_target = std::env::var("NOVAI_TARGET").unwrap_or("graphical.target".to_string());
-        let mut to_start: Vec<String> = self.units.values()
+        let default_target =
+            std::env::var("NOVAI_TARGET").unwrap_or("graphical.target".to_string());
+        let mut to_start: Vec<String> = self
+            .units
+            .values()
             .filter(|u| u.install.wanted_by.iter().any(|t| t == &default_target))
             .map(|u| u.unit.name.clone())
             .collect();
@@ -140,22 +178,24 @@ impl Manager {
             for (name, h) in self.children.iter_mut() {
                 match h.child.try_wait() {
                     Ok(Some(status)) => dead.push((name.clone(), status.code(), h.unit.clone())),
-                    Ok(None)         => {},
-                    Err(_)           => dead.push((name.clone(), None, h.unit.clone())),
+                    Ok(None) => {}
+                    Err(_) => dead.push((name.clone(), None, h.unit.clone())),
                 }
             }
             // Restart per policy
             for (name, code, unit) in dead {
                 self.children.remove(&name);
                 let should_restart = match unit.service.restart {
-                    RestartPolicy::Always     => true,
-                    RestartPolicy::OnFailure  => code.is_none() || code != Some(0),
-                    RestartPolicy::Never      => false,
+                    RestartPolicy::Always => true,
+                    RestartPolicy::OnFailure => code.is_none() || code != Some(0),
+                    RestartPolicy::Never => false,
                 };
                 if should_restart {
                     warn!("{} exited (code={:?}); restarting in 1s", name, code);
                     tokio::time::sleep(Duration::from_secs(1)).await;
-                    if let Err(e) = self.start(&name).await { error!("restart {}: {}", name, e); }
+                    if let Err(e) = self.start(&name).await {
+                        error!("restart {}: {}", name, e);
+                    }
                 } else {
                     warn!("{} exited (code={:?}); not restarting", name, code);
                 }
@@ -165,7 +205,9 @@ impl Manager {
             if shutdown_signalled().await.is_some() {
                 info!("shutdown signal received; stopping all units");
                 let names: Vec<String> = self.children.keys().cloned().collect();
-                for n in names { let _ = self.stop(&n).await; }
+                for n in names {
+                    let _ = self.stop(&n).await;
+                }
                 break;
             }
         }
@@ -175,15 +217,19 @@ impl Manager {
 
 async fn shutdown_signalled() -> Option<()> {
     use tokio::signal::unix::{signal, SignalKind};
-    static mut SIG: Option<tokio::signal::unix::Signal> = None;
-    // SAFETY: this is a supervisor; only one task.
-    unsafe {
-        if SIG.is_none() {
-            SIG = signal(SignalKind::terminate()).ok();
-        }
-        if let Some(s) = SIG.as_mut() {
-            if s.try_recv().is_ok() { return Some(()); }
-        }
+    let mut sig = signal(SignalKind::terminate()).ok()?;
+    // Non-blocking poll for a pending SIGTERM.
+    use futures::future::poll_fn;
+    use std::task::Poll;
+    let p = poll_fn(|cx| match sig.poll_recv(cx) {
+        Poll::Ready(Some(_)) => Poll::Ready(true),
+        Poll::Ready(None) => Poll::Ready(true),
+        Poll::Pending => Poll::Ready(false),
+    })
+    .await;
+    if p {
+        Some(())
+    } else {
+        None
     }
-    None
 }

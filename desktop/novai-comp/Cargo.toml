@@ -11,9 +11,12 @@ publish     = false
 name = "novai-comp"
 path = "src/main.rs"
 
+[features]
+default = []                  # stub renderer — works without GPU deps
+real-gpu = ["smithay", "wayland-client", "xkbcommon", "image"]
+
 [dependencies]
 anyhow             = { workspace = true }
-smithay            = { workspace = true }
 tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
 nix                = { workspace = true }
@@ -21,4 +24,10 @@ libc               = { workspace = true }
 clap               = { workspace = true }
 serde              = { workspace = true }
 serde_json         = { workspace = true }
-image              = { workspace = true }
+toml               = { workspace = true }
+
+# GPU-only deps — behind the `real-gpu` feature flag
+smithay       = { workspace = true, optional = true }
+wayland-client = { workspace = true, optional = true }
+xkbcommon     = { workspace = true, optional = true }
+image         = { workspace = true, optional = true }

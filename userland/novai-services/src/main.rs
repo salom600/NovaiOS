@@ -52,33 +52,44 @@ enum Cmd {
     /// List loaded units.
     List,
     /// Start a unit by name.
-    Start   { name: String },
+    Start { name: String },
     /// Stop a unit by name.
-    Stop    { name: String },
+    Stop { name: String },
     /// Restart a unit by name.
     Restart { name: String },
     /// Show status of a unit.
-    Status  { name: String },
+    Status { name: String },
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(
-            if cli.verbose { "debug" } else { "info" }.parse().unwrap()
-        )
+        .with_env_filter(tracing_subscriber::EnvFilter::new(if cli.verbose {
+            "debug"
+        } else {
+            "info"
+        }))
         .try_init();
 
     let mut mgr = manager::Manager::new(cli.dir.clone());
     mgr.load_all().await?;
 
     match cli.cmd.unwrap_or(Cmd::Run) {
-        Cmd::Run       => mgr.run().await,
-        Cmd::List      => { mgr.list(); Ok(()) }
-        Cmd::Start{n}  => mgr.start(&n).await,
-        Cmd::Stop{n}   => mgr.stop(&n).await,
-        Cmd::Restart{n}=> { mgr.stop(&n).await?; mgr.start(&n).await }
-        Cmd::Status{n} => { mgr.status(&n); Ok(()) }
+        Cmd::Run => mgr.run().await,
+        Cmd::List => {
+            mgr.list();
+            Ok(())
+        }
+        Cmd::Start { name } => mgr.start(&name).await,
+        Cmd::Stop { name } => mgr.stop(&name).await,
+        Cmd::Restart { name } => {
+            mgr.stop(&name).await?;
+            mgr.start(&name).await
+        }
+        Cmd::Status { name } => {
+            mgr.status(&name);
+            Ok(())
+        }
     }
 }

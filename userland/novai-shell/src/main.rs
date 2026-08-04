@@ -14,7 +14,7 @@
 use anyhow::Result;
 use colored::*;
 use rustyline::error::ReadlineError;
-use rustyline::{DefaultEditor, Result as RlResult};
+use rustyline::DefaultEditor;
 use std::env;
 use std::path::PathBuf;
 use std::process::Command;
@@ -35,11 +35,15 @@ fn main() -> Result<()> {
 
 fn interactive() -> Result<()> {
     let mut rl = DefaultEditor::new().map_err(|e| anyhow::anyhow!("rustyline init: {e}"))?;
-    let history = dirs::cache_dir().unwrap_or_else(|| PathBuf::from("/tmp"))
+    let history = dirs::cache_dir()
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
         .join("novai-shell-history.txt");
     let _ = rl.load_history(&history);
 
-    println!("{}", "NovaiOS shell — type 'help' for built-in commands".cyan());
+    println!(
+        "{}",
+        "NovaiOS shell — type 'help' for built-in commands".cyan()
+    );
     loop {
         let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
         let home = env::var("HOME").unwrap_or_default();
@@ -48,9 +52,14 @@ fn interactive() -> Result<()> {
         } else {
             cwd.display().to_string()
         };
-        let user  = env::var("USER").unwrap_or_else(|_| "novai".into());
-        let host  = hostname().unwrap_or_else(|| "novai".into());
-        let prompt = format!("{}@{} {} > ", user.green(), host.green(), display_cwd.blue());
+        let user = env::var("USER").unwrap_or_else(|_| "novai".into());
+        let host = hostname().unwrap_or_else(|| "novai".into());
+        let prompt = format!(
+            "{}@{} {} > ",
+            user.green(),
+            host.green(),
+            display_cwd.blue()
+        );
 
         match rl.readline(&prompt) {
             Ok(line) if line.trim().is_empty() => continue,
@@ -61,8 +70,14 @@ fn interactive() -> Result<()> {
                 }
             }
             Err(ReadlineError::Interrupted) => continue,
-            Err(ReadlineError::Eof)         => { println!("exit"); break; }
-            Err(e) => { eprintln!("{}: {}", "readline error".red(), e); break; }
+            Err(ReadlineError::Eof) => {
+                println!("exit");
+                break;
+            }
+            Err(e) => {
+                eprintln!("{}: {}", "readline error".red(), e);
+                break;
+            }
         }
     }
     let _ = rl.save_history(&history);
@@ -71,11 +86,12 @@ fn interactive() -> Result<()> {
 
 fn run_line(input: &str) -> Result<()> {
     let commands = parser::split_pipeline(input);
-    let mut last_input: Option<String> = None;
     let mut last_status = 0;
     for cmd in commands {
         let argv = parser::tokenize(&cmd);
-        if argv.is_empty() { continue; }
+        if argv.is_empty() {
+            continue;
+        }
         // Built-in?
         if builtins::is_builtin(&argv[0]) {
             last_status = builtins::run(&argv)?;
@@ -100,8 +116,7 @@ fn run_line(input: &str) -> Result<()> {
 }
 
 fn hostname() -> Option<String> {
-    std::fs::read_to_string("/etc/hostname").ok().map(|s| s.trim().to_string())
+    std::fs::read_to_string("/etc/hostname")
+        .ok()
+        .map(|s| s.trim().to_string())
 }
-
-#[allow(dead_code)]
-fn _unused(_: RlResult) {}

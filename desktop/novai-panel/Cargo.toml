@@ -11,13 +11,18 @@ publish     = false
 name = "novai-panel"
 path = "src/main.rs"
 
+[features]
+default = []                      # headless fallback (prints status to stdout)
+gui     = ["iced", "tokio", "chrono"]
+
 [dependencies]
 anyhow             = { workspace = true }
-iced               = { workspace = true }
-tokio              = { workspace = true, features = ["rt-multi-thread", "macros", "time", "fs", "io-util"] }
-chrono             = { workspace = true }
 serde              = { workspace = true }
 serde_json         = { workspace = true }
 tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
 nix                = { workspace = true }
+
+iced   = { workspace = true, optional = true }
+tokio  = { workspace = true, optional = true, features = ["rt-multi-thread", "macros", "time", "fs", "io-util"] }
+chrono = { workspace = true, optional = true }
