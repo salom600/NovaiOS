@@ -49,9 +49,17 @@ fn main() -> Result<()> {
 
     let cmd = Cmdline::parse().unwrap_or_default();
     info!(
-        "cmdline: live={}, root={:?}, init={:?}",
-        cmd.live, cmd.root, cmd.init
+        "cmdline: live={}, root={:?}, init={:?}, install={}",
+        cmd.live, cmd.root, cmd.init, cmd.install
     );
+
+    // If install mode is requested, drop a flag file the desktop session picks up
+    // to auto-launch Calamares on first login.
+    if cmd.install {
+        std::fs::create_dir_all("/run/novai").ok();
+        std::fs::write("/run/novai/install-mode", "1").ok();
+        info!("install mode requested — /run/novai/install-mode written");
+    }
 
     // ---- 1. Mount the API filesystems needed to even read /proc/cmdline ----
     mountfs::mount_early()?;

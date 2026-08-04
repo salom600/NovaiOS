@@ -24,6 +24,7 @@ members = [
     "userland/novai-coreutils",
     "userland/novai-shell",
     "userland/novai-pkg",
+    "userland/novai-installer",
 
     # ---- Desktop environment (Wayland) ----
     "desktop/novai-comp",

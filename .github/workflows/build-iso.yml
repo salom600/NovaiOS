@@ -107,10 +107,11 @@ jobs:
       - name: Stage binaries
         run: |
           mkdir -p build/userland/bin
-          for bin in novai-init novai-services novai-shell novai-coreutils novai-pkg \
+          for bin in novai-init novai-services novai-shell novai-coreutils novai-pkg novai-installer \
                      novai-comp novai-panel novai-launcher novai-settings novai-lock; do
             if [[ -f target/release/$bin ]]; then cp target/release/$bin build/userland/bin/; fi
           done
+          ls -la build/userland/bin/
           tar -czf build/userland.tar.gz -C build userland
 
       - uses: actions/upload-artifact@v4
@@ -196,7 +197,7 @@ jobs:
     runs-on: ubuntu-22.04
     needs: [ userland ]   # kernel is best-effort; ISO falls back to stock arch kernel
     if: always()          # build the ISO even if kernel failed — we use stock arch kernel as fallback
-    timeout-minutes: 60
+    timeout-minutes: 90   # extended because the package list is much larger now
     container:
       image: archlinux:latest
       options: --privileged
@@ -205,11 +206,14 @@ jobs:
 
       - name: Set up archlinux environment
         run: |
+          # Pre-install the host tools build-iso.sh needs to bootstrap the rootfs
+          # (the script does its own pacstrap for the rootfs with the full package list).
           pacman -Syu --noconfirm --needed \
             base base-devel arch-install-scripts \
-            linux linux-headers \
-            linux-firmware dracut squashfs-tools xorriso dosfstools mtools \
-            syslinux systemd rustup git wget curl which sudo nano \
+            linux linux-headers linux-firmware \
+            dracut squashfs-tools xorriso dosfstools mtools \
+            syslinux systemd-boot-efi efibootmgr grub \
+            systemd rustup git wget curl which sudo nano \
             clang llvm lld pkgconf
           rustup default stable
 
@@ -235,22 +239,18 @@ jobs:
           else
             echo "::warning::Custom kernel build failed — falling back to stock Arch linux kernel"
             mkdir -p build/out-kernel
-            # Copy the stock arch kernel as our vmlinuz-novai
             cp /boot/vmlinuz-linux build/out-kernel/vmlinuz-novai
             cp /boot/System.map-linux build/out-kernel/System.map-novai 2>/dev/null || true
-            # Make a config-novai placeholder
             zcat /proc/config.gz > build/out-kernel/config-novai 2>/dev/null || echo "# fallback stock arch config" > build/out-kernel/config-novai
-            # Use stock kernel modules path
             mkdir -p build/modules/lib/modules
             cp -a /lib/modules/* build/modules/lib/modules/ 2>/dev/null || true
           fi
 
-      - name: Build ISO
+      - name: Build ISO (with full package set + EFI boot menu)
         run: ./scripts/build-iso.sh
         env:
           WORK: ${{ github.workspace }}/build/iso-work
           OUT_DIR: ${{ github.workspace }}/build/out
-          KVER_FALLBACK: $(uname -r)
 
       - uses: actions/upload-artifact@v4
         with:

@@ -2066,6 +2066,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "novai-installer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "nix 0.29.0",
+ "tracing",
+ "tracing-subscriber",
+ "which",
+]
+
+[[package]]
 name = "novai-launcher"
 version = "0.1.0"
 dependencies = [

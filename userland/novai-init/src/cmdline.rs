@@ -8,6 +8,7 @@
 //!   novai.debug=1          — verbose logging
 //!   novai.squashfs=<path>  — explicit squashfs location
 //!   novai.no_overlay=1     — skip the overlay (debug only)
+//!   novai.install=1        — boot live then auto-launch the installer (Calamares)
 //!
 //! Also reads the standard `init=` and `root=` keys as a fallback.
 
@@ -24,6 +25,7 @@ pub struct Cmdline {
     pub squashfs: Option<String>,
     pub debug: bool,
     pub no_overlay: bool,
+    pub install: bool,
     pub extra: std::collections::HashMap<String, String>,
 }
 
@@ -57,6 +59,7 @@ impl Cmdline {
                 "novai.squashfs" => c.squashfs = v.map(str::to_owned),
                 "novai.debug" => c.debug = v.map(|x| x == "1").unwrap_or(true),
                 "novai.no_overlay" => c.no_overlay = v.map(|x| x == "1").unwrap_or(true),
+                "novai.install" => c.install = v.map(|x| x == "1").unwrap_or(true),
                 "init" => {
                     if c.init.is_none() {
                         c.init = v.map(str::to_owned);
@@ -97,5 +100,11 @@ mod tests {
         let c = Cmdline::parse_str("novai.root=/dev/sda2:ext4:rw");
         assert!(!c.live);
         assert_eq!(c.root.as_deref(), Some("/dev/sda2:ext4:rw"));
+    }
+    #[test]
+    fn parses_install_flag() {
+        let c = Cmdline::parse_str("novai.live=1 novai.install=1");
+        assert!(c.live);
+        assert!(c.install);
     }
 }

@@ -1,0 +1,26 @@
+# NovaiOS Calamares configuration — main brand descriptor
+---
+component-name: novaios
+
+strings:
+    productName:         "NovaiOS"
+    shortProductName:    "NovaiOS"
+    version:             "0.1"
+    shortVersion:        "0.1"
+    catalogSubtitle:     "Modern Rust-based Linux"
+    productUrl:          "https://github.com/salom600/NovaiOS"
+    supportUrl:          "https://github.com/salom600/NovaiOS/issues"
+    knownIssuesUrl:      "https://github.com/salom600/NovaiOS/issues"
+
+images:
+    productLogo:         "/usr/share/novai/logo.png"
+    productIcon:         "/usr/share/novai/logo.png"
+    productWelcome:      "/usr/share/novai/welcome.png"
+
+slideshow:               "show.qml"
+slideshowAPI:            1
+
+style:
+    sidebarBackground:    "#10121c"
+    sidebarText:          "#f3f4f8"
+    sidebarTextSelect:    "#7c3aed"

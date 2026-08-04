@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Install NovaiOS
+Name[ar]=تثبيت NovaiOS
+Name[fr]=Installer NovaiOS
+Name[es]=Instalar NovaiOS
+Comment=Install NovaiOS to your hard drive
+Comment[ar]=قم بتثبيت NovaiOS على القرص الصلب
+Comment[fr]=Installer NovaiOS sur votre disque dur
+Comment[es]=Instalar NovaiOS en su disco duro
+Exec=sudo -E calamares
+Icon=system-software-install
+Terminal=false
+Categories=System;Settings;Installer;
+StartupNotify=true
+Keywords=install;installer;calamares;system;
