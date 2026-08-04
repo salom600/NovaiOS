@@ -48,7 +48,16 @@ if ! command -v pacstrap >/dev/null; then
   exit 1
 fi
 
+# Enable the multilib repo (needed for steam + 32-bit graphics drivers).
+# The archlinux:latest container ships pacman.conf without it active.
+if ! grep -q '^\[multilib\]' /etc/pacman.conf; then
+  sed -i '/^\[core\]/i [multilib]\nInclude = /etc/pacman.d/mirrorlist' /etc/pacman.conf
+fi
+pacman -Sy --noconfirm
+
 # Comprehensive package list — "literally complete with everything"
+# All package names verified against the official Arch repo (Aug 2026).
+# Packages that live only in AUR (calamares, etc.) are installed separately below.
 pacstrap -c -M -G "$ROOTFS" \
   base base-devel linux linux-headers linux-firmware \
   systemd systemd-sysvcompat dbus networkmanager \
@@ -61,8 +70,7 @@ pacstrap -c -M -G "$ROOTFS" \
   uutils-coreutils nushell bat fd ripgrep eza zoxide starship helix yazi \
   firefox chromium \
   seatd polkit \
-  --needed \
-  calamares calamares-config-generic archinstall \
+  archinstall \
   gparted partitionmanager dosfstools ntfs-3g exfatprogs f2fs-tools btrfs-progs xfsprogs \
   gnu-free-fonts ttf-dejavu ttf-liberation noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-nerd-fonts-symbols \
   gnome-themes-extra papirus-icon-theme breeze-icons hicolor-icon-theme \
@@ -85,7 +93,7 @@ pacstrap -c -M -G "$ROOTFS" \
   tmux screen \
   htop btop iotop iftop nethogs \
   unzip zip p7zip unrar \
-  openssh openssh-askpass \
+  openssh x11-ssh-askpass \
   rsync rclone \
   ffmpeg imagemagick \
   cups cups-pdf system-config-printer \
@@ -96,6 +104,42 @@ pacstrap -c -M -G "$ROOTFS" \
   pkgconf clang llvm lld \
   --needed
 
+# Enable multilib inside the rootfs too (so steam works after install)
+if ! grep -q '^\[multilib\]' "$ROOTFS/etc/pacman.conf"; then
+  sed -i '/^\[core\]/i [multilib]\nInclude = /etc/pacman.d/mirrorlist' "$ROOTFS/etc/pacman.conf"
+fi
+
+echo "::endgroup::"
+
+# =============================================================================
+# 1b. Install Calamares from AUR (not in official repos)
+# =============================================================================
+echo "::group::1b. Install Calamares from AUR"
+# Calamares is in the AUR, not the official repos. Build it inside the chroot.
+# This is best-effort — if the AUR build fails, archinstall is still available
+# as the TUI fallback installer.
+arch-chroot "$ROOTFS" bash -c '
+  set -e
+  # Create a build user (makepkg refuses to run as root)
+  id builduser &>/dev/null || useradd -m -G wheel -s /bin/bash builduser
+  echo "builduser ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builduser
+  cd /home/builduser
+
+  # Install AUR helper (yay) — easier than raw makepkg
+  sudo -u builduser git clone https://aur.archlinux.org/yay.git 2>/dev/null || true
+  cd yay
+  sudo -u builduser git pull --rebase 2>/dev/null || true
+  sudo -u builduser makepkg -si --noconfirm --needed 2>&1 || echo "::warning::yay install failed"
+
+  # Use yay to install calamares + its generic config
+  if command -v yay >/dev/null; then
+    sudo -u builduser yay -S --noconfirm --needed calamares calamares-config-generic 2>&1 || \
+      echo "::warning::calamares AUR install failed — archinstall will be the only installer"
+  fi
+
+  # Clean up build artifacts to save space in the squashfs
+  rm -rf /home/builduser/.cache /home/builduser/yay /var/cache/pacman/pkg/*
+' 2>&1 || echo "::warning::AUR/calamares setup failed — archinstall remains available"
 echo "::endgroup::"
 
 # =============================================================================
