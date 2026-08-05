@@ -258,10 +258,15 @@ if [[ -f "$ROOTFS/usr/bin/novai-init" ]]; then
 fi
 
 # dracut config
+# Note: 'overlay' and 'squashfs' are kernel modules (drivers), not dracut
+# modules. The dracut modules that handle live boot are 'dmsquash-live'
+# (ships with dracut) or our custom 'novai' module.
+# Don't list kernel modules as dracut modules.
 cat > "$ROOTFS/etc/dracut.conf.d/novai.conf" <<'EOF'
-add_dracutmodules+=" novai overlay squashfs "
+add_dracutmodules+=" novai "
 add_drivers+=" overlay squashfs loop isofs ext4 vfat ahci nvme virtio_blk virtio_pci virtio_net virtio_console amd_pstate "
 compress="zstd"
+omit_dracutmodules+=" busybox "
 EOF
 
 # Custom dracut module: mounts the squashfs from the ISO
@@ -508,7 +513,9 @@ for p in /usr/lib/syslinux/bios/isohdpfx.bin /usr/share/syslinux/isohdpfx.bin; d
 done
 
 # Copy the ESP image into the ISO tree at /EFI/esp.img (referenced by xorriso -e)
+install -d "$ISO_DIR/EFI"
 cp "$ESP_IMG" "$ISO_DIR/EFI/esp.img"
+echo "ESP image copied to ISO tree: $(du -h "$ISO_DIR/EFI/esp.img" | cut -f1)"
 echo "::endgroup::"
 
 # =============================================================================
