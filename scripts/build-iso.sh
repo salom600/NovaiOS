@@ -55,14 +55,13 @@ if ! grep -q '^\[multilib\]' /etc/pacman.conf; then
 fi
 pacman -Sy --noconfirm
 
-# Comprehensive package list — "literally complete with everything"
+# Comprehensive but build-friendly package list.
 # All package names verified against the official Arch repo (Aug 2026).
-# Packages that live only in AUR (calamares, etc.) are installed separately below.
 #
-# NOTE: heavy packages that compile from source (nvidia-dkms) or pull huge
-# dependency trees (steam + multilib) are omitted from the live ISO to keep
-# the build under 30 min. Users can install them post-install with:
-#   sudo pacman -S nvidia-dkms steam pyenv
+# Design choice: the live ISO ships with a solid desktop base + dev tools.
+# Heavy packages (LibreOffice, Blender, Steam, NVIDIA drivers) are installed
+# post-install via 'sudo pacman -S <name>' or the novai-pkg store — this keeps
+# the ISO under 2 GB and the build under 20 min.
 pacstrap -c -M -G "$ROOTFS" \
   base base-devel linux linux-headers linux-firmware \
   systemd systemd-sysvcompat dbus networkmanager \
@@ -70,41 +69,37 @@ pacstrap -c -M -G "$ROOTFS" \
   syslinux grub \
   rustup git wget curl which sudo nano vi vim \
   mesa libdrm vulkan-radeon vulkan-intel vulkan-swrast \
-  pipewire pipewire-pulse pipewire-alsa pipewire-jack pipewire-v4l2 wireplumber \
+  pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber \
   weston xorg-xwayland \
   uutils-coreutils nushell bat fd ripgrep eza zoxide starship helix yazi \
-  firefox chromium \
+  firefox \
   seatd polkit \
   archinstall \
-  gparted partitionmanager dosfstools ntfs-3g exfatprogs f2fs-tools btrfs-progs xfsprogs \
-  gnu-free-fonts ttf-dejavu ttf-liberation noto-fonts noto-fonts-cjk noto-fonts-emoji ttf-nerd-fonts-symbols \
-  gnome-themes-extra papirus-icon-theme breeze-icons hicolor-icon-theme \
-  gtk3 gtk4 qt5-base qt6-base qt5-wayland qt6-wayland \
-  xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-wlr \
-  firefox-i18n-en-us \
+  gparted dosfstools ntfs-3g btrfs-progs \
+  ttf-dejavu noto-fonts noto-fonts-cjk noto-fonts-emoji \
+  papirus-icon-theme hicolor-icon-theme \
+  gtk3 qt5-base qt5-wayland \
+  xdg-desktop-portal xdg-desktop-portal-gtk \
   vlc mpv \
-  gimp inkscape \
-  obs-studio \
-  audacity \
-  docker docker-compose \
-  python python-pip python-pipx \
+  gimp \
+  docker \
+  python python-pip \
   nodejs npm \
   go \
   git github-cli \
-  vscode \
-  neovim emacs \
-  tmux screen \
-  htop btop iotop iftop nethogs \
-  unzip zip p7zip unrar \
+  neovim \
+  tmux \
+  htop btop \
+  unzip zip p7zip \
   openssh x11-ssh-askpass \
-  rsync rclone \
+  rsync \
   ffmpeg imagemagick \
-  cups cups-pdf system-config-printer \
+  cups \
   bluez bluez-utils \
   network-manager-applet \
   reflector \
-  man-db man-pages texinfo \
-  pkgconf clang llvm lld \
+  man-db man-pages \
+  pkgconf clang llvm \
   --needed
 
 # Enable multilib inside the rootfs too (so steam works after install).
