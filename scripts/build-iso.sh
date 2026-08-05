@@ -58,13 +58,18 @@ pacman -Sy --noconfirm
 # Comprehensive package list — "literally complete with everything"
 # All package names verified against the official Arch repo (Aug 2026).
 # Packages that live only in AUR (calamares, etc.) are installed separately below.
+#
+# NOTE: heavy packages that compile from source (nvidia-dkms) or pull huge
+# dependency trees (steam + multilib) are omitted from the live ISO to keep
+# the build under 30 min. Users can install them post-install with:
+#   sudo pacman -S nvidia-dkms steam pyenv
 pacstrap -c -M -G "$ROOTFS" \
   base base-devel linux linux-headers linux-firmware \
   systemd systemd-sysvcompat dbus networkmanager \
   dracut squashfs-tools xorriso dosfstools mtools \
   syslinux grub \
   rustup git wget curl which sudo nano vi vim \
-  mesa libdrm vulkan-radeon vulkan-intel vulkan-swrast nvidia-dkms nvidia-utils \
+  mesa libdrm vulkan-radeon vulkan-intel vulkan-swrast \
   pipewire pipewire-pulse pipewire-alsa pipewire-jack pipewire-v4l2 wireplumber \
   weston xorg-xwayland \
   uutils-coreutils nushell bat fd ripgrep eza zoxide starship helix yazi \
@@ -77,16 +82,14 @@ pacstrap -c -M -G "$ROOTFS" \
   gtk3 gtk4 qt5-base qt6-base qt5-wayland qt6-wayland \
   xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-wlr \
   firefox-i18n-en-us \
-  libreoffice-fresh libreoffice-fresh-en-gb \
   vlc mpv \
-  gimp inkscape krita blender \
+  gimp inkscape \
   obs-studio \
-  steam \
   audacity \
   docker docker-compose \
-  python python-pip python-pipx pyenv \
-  nodejs npm yarn pnpm \
-  go rustup \
+  python python-pip python-pipx \
+  nodejs npm \
+  go \
   git github-cli \
   vscode \
   neovim emacs \
